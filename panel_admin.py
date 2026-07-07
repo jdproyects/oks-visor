@@ -117,19 +117,45 @@ else:
                 st.info("👈 Selecciona Vendedor y Día en el menú lateral.")
 
     # ==========================================
-    # PANEL GESTIÓN (Funcionalidad de actualización)
+    # PANEL GESTIÓN (Modo Sobrescribir Todo)
     # ==========================================
     elif modo == "Panel Gestión (Actualizar Clientes)":
-        st.title("🔄 Actualización de Clientes")
-        if st.button("🚀 Ejecutar Sincronización"):
-            if os.path.exists('rutas_optimizadas.xlsx') and os.path.exists('nuevos_clientes.xlsx'):
-                df_m = pd.read_excel('rutas_optimizadas.xlsx')
-                df_n = pd.read_excel('nuevos_clientes.xlsx')
-                df_m['Codigo_Cliente'] = df_m['Codigo_Cliente'].astype(str).str.strip()
-                df_n['Codigo_Cliente'] = df_n['Codigo_Cliente'].astype(str).str.strip()
-                
-                df_final = pd.concat([df_m, df_n]).drop_duplicates(subset=['Codigo_Cliente'], keep='last')
-                df_final.to_excel('rutas_optimizadas.xlsx', index=False)
-                st.success("¡Base de datos maestra actualizada!")
-            else:
-                st.error("Archivos necesarios no encontrados.")
+        st.title("🔄 Reemplazo de la Base de Datos de Clientes")
+        st.markdown("""
+        ⚠️ **ATENCIÓN: Modo de Reemplazo Total.** Al subir un archivo nuevo, **se borrará toda la información anterior**. El mapa de rutas mostrará ÚNICAMENTE los clientes de este nuevo archivo.
+        """)
+
+        # Widget para arrastrar y soltar el archivo
+        archivo_cargado = st.file_uploader("📂 Selecciona o arrastra tu archivo Excel (.xlsx)", type=["xlsx"])
+
+        if archivo_cargado is not None:
+            try:
+                # Leer el archivo que subió el usuario
+                df_n = pd.read_excel(archivo_cargado)
+                df_n.columns = df_n.columns.str.strip()
+
+                st.subheader("👀 Vista previa de los nuevos datos:")
+                st.dataframe(df_n.head(10)) # Muestra las primeras 10 filas
+
+                # Botón para confirmar el reemplazo
+                if st.button("🚀 Reemplazar Base de Datos"):
+                    archivo_maestro = 'rutas_optimizadas.xlsx'
+
+                    # Homologar formatos de códigos de cliente
+                    df_n['Codigo_Cliente'] = df_n['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
+
+                    # Validar columnas mínimas requeridas para que el mapa no se rompa
+                    columnas_requeridas = ['Codigo_Cliente', 'Cliente', 'Latitud', 'Longitud', 'Vendedor', 'Dia', 'Direccion_Completa']
+                    columnas_faltantes = [col for col in columnas_requeridas if col not in df_n.columns]
+
+                    if columnas_faltantes:
+                        st.error(f"❌ El archivo que subiste no tiene todas las columnas necesarias. Faltan: {', '.join(columnas_faltantes)}")
+                    else:
+                        # REEMPLAZO DIRECTO: Se guarda el dataframe nuevo sobre el archivo maestro ignorando lo viejo
+                        df_n.to_excel(archivo_maestro, index=False)
+                        st.success("🎉 ¡Base de datos reemplazada con éxito! Ya podés ir al 'Panel Principal (Rutas)' y ver únicamente a tus nuevos clientes.")
+            
+            except Exception as e:
+                st.error(f"❌ Ocurrió un error al procesar el archivo: {e}")
+        else:
+            st.info("💡 Por favor, subí un archivo Excel para habilitar el botón de reemplazo.")
