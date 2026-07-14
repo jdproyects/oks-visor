@@ -157,11 +157,11 @@ else:
             st.info("💡 Por favor, subí un archivo Excel para habilitar el botón de reemplazo.")
 
     # ==========================================
-    # PANEL NO COMPRADORES (Actualizado con cruce de coordenadas)
+    # PANEL NO COMPRADORES (Actualizado)
     # ==========================================
     elif modo == "Panel No Compradores":
         archivo_no_compradores = 'no_compradores.xlsx' 
-        archivo_coordenadas = 'clientes_prueba.xlsx'
+        archivo_coordenadas = 'nuevos_clientes.xlsx' # ACÁ ESTÁ EL CAMBIO
 
         st.title("🚫 Panel de Clientes No Compradores")
         st.markdown("Muestra la ubicación de aquellos clientes que requieren seguimiento, cruzando las coordenadas automáticamente con tu base de datos.")
@@ -187,7 +187,7 @@ else:
                 # Verificar si faltaron coordenadas de algún cliente
                 clientes_sin_coord = df_nc['Latitud'].isna().sum()
                 if clientes_sin_coord > 0:
-                    st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'clientes_prueba.xlsx' y no aparecerán en el mapa.")
+                    st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'nuevos_clientes.xlsx' y no aparecerán en el mapa.") # ACÁ ESTÁ EL CAMBIO
                 
                 # Filtrar solo los que sí tienen coordenadas válidas para que el mapa no falle
                 df_nc = df_nc.dropna(subset=['Latitud', 'Longitud'])
@@ -243,6 +243,6 @@ else:
                 else:
                     st.info("👈 Selecciona Vendedor y Día en el menú lateral para ver el mapa.")
             else:
-                st.error("❌ No se encontró el archivo 'clientes_prueba.xlsx'. Es necesario para extraer las coordenadas.")
+                st.error("❌ No se encontró el archivo 'nuevos_clientes.xlsx'. Es necesario para extraer las coordenadas.") # ACÁ ESTÁ EL CAMBIO
         else:
             st.warning("⚠️ No se encontró el archivo 'no_compradores.xlsx'. Por favor, asegúrate de guardarlo en la misma carpeta que este script.")
