@@ -157,92 +157,110 @@ else:
             st.info("💡 Por favor, subí un archivo Excel para habilitar el botón de reemplazo.")
 
     # ==========================================
-    # PANEL NO COMPRADORES (Actualizado)
+    # PANEL NO COMPRADORES
     # ==========================================
     elif modo == "Panel No Compradores":
         archivo_no_compradores = 'no_compradores.xlsx' 
-        archivo_coordenadas = 'nuevos_clientes.xlsx' # ACÁ ESTÁ EL CAMBIO
+        archivo_coordenadas = 'clientes_prueba.xlsx' # Volvemos a apuntar a clientes_prueba.xlsx
 
         st.title("🚫 Panel de Clientes No Compradores")
-        st.markdown("Muestra la ubicación de aquellos clientes que requieren seguimiento, cruzando las coordenadas automáticamente con tu base de datos.")
+        st.markdown("Muestra la ubicación de aquellos clientes que requieren seguimiento, rescatando las coordenadas automáticamente desde tu base de clientes de prueba.")
 
         if os.path.exists(archivo_no_compradores):
             if os.path.exists(archivo_coordenadas):
-                # Leer el archivo de no compradores
+                # 1. Leer el archivo de no compradores
                 df_nc = pd.read_excel(archivo_no_compradores)
                 df_nc.columns = df_nc.columns.str.strip()
                 df_nc['Codigo_Cliente'] = df_nc['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
                 
-                # Leer el archivo que tiene las coordenadas
+                # 2. Leer la base que tiene las coordenadas
                 df_coords = pd.read_excel(archivo_coordenadas)
                 df_coords.columns = df_coords.columns.str.strip()
                 df_coords['Codigo_Cliente'] = df_coords['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
                 
-                # Quedarnos solo con las columnas necesarias para no duplicar datos
-                df_coords_limpio = df_coords[['Codigo_Cliente', 'Latitud', 'Longitud']].drop_duplicates(subset=['Codigo_Cliente'])
-                
-                # Cruzar la información (merge)
-                df_nc = pd.merge(df_nc, df_coords_limpio, on='Codigo_Cliente', how='left')
-
-                # Verificar si faltaron coordenadas de algún cliente
-                clientes_sin_coord = df_nc['Latitud'].isna().sum()
-                if clientes_sin_coord > 0:
-                    st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'nuevos_clientes.xlsx' y no aparecerán en el mapa.") # ACÁ ESTÁ EL CAMBIO
-                
-                # Filtrar solo los que sí tienen coordenadas válidas para que el mapa no falle
-                df_nc = df_nc.dropna(subset=['Latitud', 'Longitud'])
-
-                st.sidebar.header("Filtros No Compradores")
-                vendedores_nc = st.sidebar.multiselect("Seleccionar Vendedores:", sorted(df_nc['Vendedor'].dropna().unique().tolist()), key="vend_nc")
-                dias_nc = st.sidebar.multiselect("Seleccionar Días:", ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'], default=[], key="dia_nc")
-
-                if vendedores_nc and dias_nc:
-                    df_nc_f = df_nc[(df_nc['Vendedor'].isin(vendedores_nc)) & (df_nc['Dia'].isin(dias_nc))].copy()
-                    
-                    if not df_nc_f.empty:
-                        centro = [df_nc_f['Latitud'].mean(), df_nc_f['Longitud'].mean()]
-                        m_nc = folium.Map(location=centro, zoom_start=14, tiles='cartodbpositron')
-
-                        for _, row in df_nc_f.iterrows():
-                            coord = [row['Latitud'], row['Longitud']]
-                            cod_cliente = row['Codigo_Cliente']
-                            
-                            color_pin = 'gray'
-                                
-                            html_popup = f"""
-                            <div style="font-family: Arial, sans-serif; min-width: 250px; font-size: 12px;">
-                                <h4 style="margin: 0 0 5px 0; color: #555555;">{row['Cliente']}</h4>
-                                <table style="width: 100%; border-collapse: collapse;">
-                                    <tr><td><b>Código:</b></td><td>{row['Codigo_Cliente']}</td></tr>
-                                    <tr><td><b>Vendedor:</b></td><td>{row['Vendedor']}</td></tr>
-                                    <tr><td><b>Día:</b></td><td>{row['Dia']}</td></tr>
-                                    <tr><td colspan="2"><hr style="margin: 5px 0;"></td></tr>
-                                    <tr><td colspan="2"><b>Dirección:</b><br>{row['Direccion_Completa']}</td></tr>
-                                </table>
-                            </div>
-                            """
-                            
-                            folium.Marker(
-                                location=coord,
-                                popup=folium.Popup(html_popup, max_width=350), 
-                                tooltip=cod_cliente,
-                                icon=folium.Icon(color=color_pin, icon='remove-circle', prefix='glyphicon')
-                            ).add_to(m_nc)
-
-                            folium.Marker(
-                                location=coord,
-                                icon=folium.DivIcon(
-                                    icon_size=(150,36), icon_anchor=(7, 18),
-                                    html=f"""<div style="font-family: 'Arial Black'; color: #000; font-size: 10pt; font-weight: 900; text-shadow: 1px 1px 0 #FFF, -1px -1px 0 #FFF;">{cod_cliente}</div>"""
-                                )
-                            ).add_to(m_nc)
-                        
-                        st_folium(m_nc, width=1200, height=750)
-                    else:
-                        st.warning("No se encontraron registros de no compradores para estos filtros.")
+                # Validar que al menos existan Latitud y Longitud
+                if 'Latitud' not in df_coords.columns or 'Longitud' not in df_coords.columns:
+                    st.error("❌ El archivo 'clientes_prueba.xlsx' no tiene las columnas 'Latitud' y 'Longitud'. Por favor, verifica el archivo.")
                 else:
-                    st.info("👈 Selecciona Vendedor y Día en el menú lateral para ver el mapa.")
+                    # 3. Preparar las columnas a extraer
+                    columnas_extraer = ['Codigo_Cliente', 'Latitud', 'Longitud']
+                    
+                    if 'Cliente' not in df_nc.columns and 'Cliente' in df_coords.columns:
+                        columnas_extraer.append('Cliente')
+                    if 'Direccion_Completa' not in df_nc.columns and 'Direccion_Completa' in df_coords.columns:
+                        columnas_extraer.append('Direccion_Completa')
+                        
+                    df_coords_limpio = df_coords[columnas_extraer].drop_duplicates(subset=['Codigo_Cliente'])
+                    
+                    # 4. Cruzar la información (merge)
+                    df_nc = pd.merge(df_nc, df_coords_limpio, on='Codigo_Cliente', how='left')
+
+                    # Verificar si faltaron coordenadas
+                    clientes_sin_coord = df_nc['Latitud'].isna().sum()
+                    if clientes_sin_coord > 0:
+                        st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'clientes_prueba.xlsx' y no aparecerán en el mapa.") 
+                    
+                    # Filtrar solo los que sí tienen coordenadas válidas
+                    df_nc = df_nc.dropna(subset=['Latitud', 'Longitud'])
+
+                    # Para los filtros, nos aseguramos de usar la columna correcta (como 'dia visita' de tu imagen)
+                    columna_vendedor = 'Vendedor' if 'Vendedor' in df_nc.columns else df_nc.columns[2]
+                    columna_dia = 'Dia' if 'Dia' in df_nc.columns else ('dia visita' if 'dia visita' in df_nc.columns else df_nc.columns[1])
+
+                    st.sidebar.header("Filtros No Compradores")
+                    vendedores_nc = st.sidebar.multiselect("Seleccionar Vendedores:", sorted(df_nc[columna_vendedor].dropna().unique().tolist()), key="vend_nc")
+                    dias_unicos = sorted(df_nc[columna_dia].dropna().unique().tolist())
+                    dias_nc = st.sidebar.multiselect("Seleccionar Días:", dias_unicos, default=[], key="dia_nc")
+
+                    if vendedores_nc and dias_nc:
+                        df_nc_f = df_nc[(df_nc[columna_vendedor].isin(vendedores_nc)) & (df_nc[columna_dia].isin(dias_nc))].copy()
+                        
+                        if not df_nc_f.empty:
+                            centro = [df_nc_f['Latitud'].mean(), df_nc_f['Longitud'].mean()]
+                            m_nc = folium.Map(location=centro, zoom_start=14, tiles='cartodbpositron')
+
+                            for _, row in df_nc_f.iterrows():
+                                coord = [row['Latitud'], row['Longitud']]
+                                cod_cliente = row['Codigo_Cliente']
+                                nombre_cliente = row.get('Cliente', 'Nombre no disponible')
+                                dir_cliente = row.get('Direccion_Completa', 'Dirección no disponible')
+                                
+                                color_pin = 'gray'
+                                    
+                                html_popup = f"""
+                                <div style="font-family: Arial, sans-serif; min-width: 250px; font-size: 12px;">
+                                    <h4 style="margin: 0 0 5px 0; color: #555555;">{nombre_cliente}</h4>
+                                    <table style="width: 100%; border-collapse: collapse;">
+                                        <tr><td><b>Código:</b></td><td>{row['Codigo_Cliente']}</td></tr>
+                                        <tr><td><b>Vendedor:</b></td><td>{row[columna_vendedor]}</td></tr>
+                                        <tr><td><b>Día:</b></td><td>{row[columna_dia]}</td></tr>
+                                        <tr><td colspan="2"><hr style="margin: 5px 0;"></td></tr>
+                                        <tr><td colspan="2"><b>Dirección:</b><br>{dir_cliente}</td></tr>
+                                    </table>
+                                </div>
+                                """
+                                
+                                folium.Marker(
+                                    location=coord,
+                                    popup=folium.Popup(html_popup, max_width=350), 
+                                    tooltip=cod_cliente,
+                                    icon=folium.Icon(color=color_pin, icon='remove-circle', prefix='glyphicon')
+                                ).add_to(m_nc)
+
+                                folium.Marker(
+                                    location=coord,
+                                    icon=folium.DivIcon(
+                                        icon_size=(150,36), icon_anchor=(7, 18),
+                                        html=f"""<div style="font-family: 'Arial Black'; color: #000; font-size: 10pt; font-weight: 900; text-shadow: 1px 1px 0 #FFF, -1px -1px 0 #FFF;">{cod_cliente}</div>"""
+                                    )
+                                ).add_to(m_nc)
+                            
+                            st_folium(m_nc, width=1200, height=750)
+                        else:
+                            st.warning("No se encontraron registros de no compradores para estos filtros.")
+                    else:
+                        st.info("👈 Selecciona Vendedor y Día en el menú lateral para ver el mapa.")
             else:
-                st.error("❌ No se encontró el archivo 'nuevos_clientes.xlsx'. Es necesario para extraer las coordenadas.") # ACÁ ESTÁ EL CAMBIO
+                st.error("❌ No se encontró el archivo 'clientes_prueba.xlsx'. Recuerda subirlo a GitHub para que Streamlit lo pueda leer.")
         else:
             st.warning("⚠️ No se encontró el archivo 'no_compradores.xlsx'. Por favor, asegúrate de guardarlo en la misma carpeta que este script.")
