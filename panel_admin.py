@@ -9,7 +9,7 @@ st.set_page_config(page_title="Distribuidora OKS - Panel", layout="wide")
 
 # --- CONFIGURACIÓN DE SEGURIDAD ---
 USUARIO_VALIDO = "admin"
-CLAVE_VALIDA = "oks2026" 
+CLAVE_VALIDA = "oks2026"
 
 def login():
     st.title("🔐 Acceso Privado OKS")
@@ -225,7 +225,19 @@ else:
                                 nombre_cliente = row.get('Cliente', 'Nombre no disponible')
                                 dir_cliente = row.get('Direccion_Completa', 'Dirección no disponible')
                                 
-                                color_pin = 'gray'
+                                # AQUI COMIENZA LA MODIFICACION DE COLORES POR VENDEDOR
+                                color_vendedores = {
+                                    'Victoria Morgado': 'green',
+                                    'Alejandro Garcia': 'blue',
+                                    'Victoria Lagos': 'red',
+                                    'Paula Pedernera': 'pink',
+                                    'Mathias Dorrego': 'orange',
+                                    'Santiago Savrasky': 'darkred', # Color más cercano a marrón en Folium
+                                    'Dalia Lopez': 'purple',
+                                    'Maximiliano Luppinaci': 'beige' # Color más cercano a amarillo en Folium
+                                }
+                                color_pin = color_vendedores.get(row[columna_vendedor], 'gray')
+                                # AQUI TERMINA LA MODIFICACION
                                     
                                 html_popup = f"""
                                 <div style="font-family: Arial, sans-serif; min-width: 250px; font-size: 12px;">
