@@ -161,7 +161,7 @@ else:
     # ==========================================
     elif modo == "Panel No Compradores":
         archivo_no_compradores = 'no_compradores.xlsx' 
-        archivo_coordenadas = 'clientes_prueba.xlsx' # Volvemos a apuntar a clientes_prueba.xlsx
+        archivo_coordenadas = 'clientes_prueba.xlsx' 
 
         st.title("🚫 Panel de Clientes No Compradores")
         st.markdown("Muestra la ubicación de aquellos clientes que requieren seguimiento, rescatando las coordenadas automáticamente desde tu base de clientes de prueba.")
@@ -203,7 +203,7 @@ else:
                     # Filtrar solo los que sí tienen coordenadas válidas
                     df_nc = df_nc.dropna(subset=['Latitud', 'Longitud'])
 
-                    # Para los filtros, nos aseguramos de usar la columna correcta (como 'dia visita' de tu imagen)
+                    # Para los filtros, nos aseguramos de usar la columna correcta
                     columna_vendedor = 'Vendedor' if 'Vendedor' in df_nc.columns else df_nc.columns[2]
                     columna_dia = 'Dia' if 'Dia' in df_nc.columns else ('dia visita' if 'dia visita' in df_nc.columns else df_nc.columns[1])
 
@@ -227,16 +227,25 @@ else:
                                 
                                 # AQUI COMIENZA LA MODIFICACION DE COLORES POR VENDEDOR
                                 color_vendedores = {
-                                    'Victoria Morgado': 'green',
-                                    'Alejandro Garcia': 'blue',
-                                    'Victoria Lagos': 'red',
-                                    'Paula Pedernera': 'pink',
-                                    'Mathias Dorrego': 'orange',
-                                    'Santiago Savrasky': 'darkred', # Color más cercano a marrón en Folium
-                                    'Dalia Lopez': 'purple',
-                                    'Maximiliano Luppinaci': 'beige' # Color más cercano a amarillo en Folium
+                                    'VICTORIA MORGADO': 'green',
+                                    'ALEJANDRO GARCIA': 'blue',
+                                    'VICTORIA LAGOS': 'red',
+                                    'PAULA PEDERNERA': 'pink',
+                                    'MATHIAS DOR': 'orange',
+                                    'SANTIAGO SAV': 'darkred', 
+                                    'DALIA LOP': 'purple',
+                                    'MAXIMILIANO LUP': 'beige' 
                                 }
-                                color_pin = color_vendedores.get(row[columna_vendedor], 'gray')
+                                
+                                # Leemos el texto del Excel y lo pasamos a MAYÚSCULAS para evitar errores
+                                vendedor_actual = str(row[columna_vendedor]).upper()
+                                color_pin = 'gray' # Color gris por defecto
+                                
+                                # Buscamos si el nombre base está dentro del texto del vendedor actual
+                                for clave, color in color_vendedores.items():
+                                    if clave in vendedor_actual:
+                                        color_pin = color
+                                        break
                                 # AQUI TERMINA LA MODIFICACION
                                     
                                 html_popup = f"""
