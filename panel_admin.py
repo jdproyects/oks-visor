@@ -228,7 +228,7 @@ else:
                                 # AQUI COMIENZA LA MODIFICACION DE COLORES POR VENDEDOR
                                 color_vendedores = {
                                     'VICTORIA MORGADO': 'green',
-                                    'ALEJANDRO GARCIA': 'blue',
+                                    'LORENA RIQUELME': 'blue',  # Reemplazaste a ALEJANDRO GARCIA por LORENA RIQUELME
                                     'VICTORIA LAGOS': 'red',
                                     'PAULA PEDERNERA': 'pink',
                                     'MATHIAS DOR': 'orange',
