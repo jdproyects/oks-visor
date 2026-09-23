@@ -44,6 +44,15 @@ else:
         st.rerun()
 
     # ==========================================
+    # LISTA DE COLORES PARA LOS VENDEDORES
+    # ==========================================
+    colores_disponibles = [
+        'red', 'blue', 'green', 'purple', 'orange', 'darkred', 
+        'lightred', 'beige', 'darkblue', 'darkgreen', 'cadetblue', 
+        'darkpurple', 'pink', 'lightblue', 'lightgreen', 'black', 'gray', 'lightgray'
+    ]
+
+    # ==========================================
     # PANEL PRINCIPAL 
     # ==========================================
     if modo == "Panel Principal (Rutas)":
@@ -54,9 +63,22 @@ else:
             df.columns = df.columns.str.strip()
             df['Codigo_Cliente'] = df['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
             
+            # --- LIMPIEZA DE DATOS ---
+            df['Vendedor'] = df['Vendedor'].astype(str).str.strip()
+            df['Dia'] = df['Dia'].astype(str).str.strip()
+            
+            df['Latitud'] = pd.to_numeric(df['Latitud'].astype(str).str.replace(',', '.'), errors='coerce')
+            df['Longitud'] = pd.to_numeric(df['Longitud'].astype(str).str.replace(',', '.'), errors='coerce')
+            
+            df = df.dropna(subset=['Latitud', 'Longitud'])
+            
+            # --- ASIGNACIÓN DINÁMICA DE COLORES POR VENDEDOR ---
+            vendedores_unicos = sorted(df['Vendedor'].dropna().unique().tolist())
+            mapa_colores = {vendedor: colores_disponibles[i % len(colores_disponibles)] for i, vendedor in enumerate(vendedores_unicos)}
+
             st.title("🗺️ Panel de Enrutamiento Interactivo OKS")
             st.sidebar.header("Filtros")
-            vendedores_sel = st.sidebar.multiselect("Seleccionar Vendedores:", sorted(df['Vendedor'].unique().tolist()))
+            vendedores_sel = st.sidebar.multiselect("Seleccionar Vendedores:", vendedores_unicos)
             dias_sel = st.sidebar.multiselect("Seleccionar Días:", ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'], default=[])
 
             if vendedores_sel and dias_sel:
@@ -64,30 +86,21 @@ else:
                 
                 if not df_f.empty:
                     centro = [df_f['Latitud'].mean(), df_f['Longitud'].mean()]
-                    m = folium.Map(location=centro, zoom_start=14, tiles='cartodbpositron')
+                    m = folium.Map(location=centro, zoom_start=14, tiles='OpenStreetMap')
 
                     for _, row in df_f.iterrows():
                         coord = [row['Latitud'], row['Longitud']]
                         cod_cliente = row['Codigo_Cliente']
+                        vendedor_row = row['Vendedor']
                         
-                        promedio = row.get('Promedio_3Meses', 'NA')
-                        tiene_compra = not (pd.isna(promedio) or str(promedio).strip().upper() in ['NA', 'N/A', '', 'NAN'])
-
-                        color_map = {
-                            'Lunes': 'darkred' if tiene_compra else 'red',
-                            'Martes': 'darkblue' if tiene_compra else 'lightblue',
-                            'Miercoles': 'darkgreen' if tiene_compra else 'lightgreen',
-                            'Jueves': 'brown' if tiene_compra else 'orange',
-                            'Viernes': 'darkpurple' if tiene_compra else 'purple'
-                        }
-                        color_pin = color_map.get(row['Dia'], 'black')
+                        color_pin = mapa_colores.get(vendedor_row, 'gray')
                             
                         html_popup = f"""
                         <div style="font-family: Arial, sans-serif; min-width: 250px; font-size: 12px;">
                             <h4 style="margin: 0 0 5px 0; color: #d32f2f;">{row['Cliente']}</h4>
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr><td><b>Código:</b></td><td>{row['Codigo_Cliente']}</td></tr>
-                                <tr><td><b>Vendedor:</b></td><td>{row['Vendedor']}</td></tr>
+                                <tr><td><b>Vendedor:</b></td><td>{vendedor_row}</td></tr>
                                 <tr><td><b>Día:</b></td><td>{row['Dia']}</td></tr>
                                 <tr><td colspan="2"><hr style="margin: 5px 0;"></td></tr>
                                 <tr><td><b>Canal:</b></td><td>{row.get('Canal', 'N/A')}</td></tr>
@@ -168,21 +181,20 @@ else:
 
         if os.path.exists(archivo_no_compradores):
             if os.path.exists(archivo_coordenadas):
-                # 1. Leer el archivo de no compradores
                 df_nc = pd.read_excel(archivo_no_compradores)
                 df_nc.columns = df_nc.columns.str.strip()
                 df_nc['Codigo_Cliente'] = df_nc['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
                 
-                # 2. Leer la base que tiene las coordenadas
                 df_coords = pd.read_excel(archivo_coordenadas)
                 df_coords.columns = df_coords.columns.str.strip()
                 df_coords['Codigo_Cliente'] = df_coords['Codigo_Cliente'].astype(str).str.replace('.0', '', regex=False).str.strip()
                 
-                # Validar que al menos existan Latitud y Longitud
                 if 'Latitud' not in df_coords.columns or 'Longitud' not in df_coords.columns:
                     st.error("❌ El archivo 'clientes_prueba.xlsx' no tiene las columnas 'Latitud' y 'Longitud'. Por favor, verifica el archivo.")
                 else:
-                    # 3. Preparar las columnas a extraer
+                    df_coords['Latitud'] = pd.to_numeric(df_coords['Latitud'].astype(str).str.replace(',', '.'), errors='coerce')
+                    df_coords['Longitud'] = pd.to_numeric(df_coords['Longitud'].astype(str).str.replace(',', '.'), errors='coerce')
+                    
                     columnas_extraer = ['Codigo_Cliente', 'Latitud', 'Longitud']
                     
                     if 'Cliente' not in df_nc.columns and 'Cliente' in df_coords.columns:
@@ -192,23 +204,24 @@ else:
                         
                     df_coords_limpio = df_coords[columnas_extraer].drop_duplicates(subset=['Codigo_Cliente'])
                     
-                    # 4. Cruzar la información (merge)
                     df_nc = pd.merge(df_nc, df_coords_limpio, on='Codigo_Cliente', how='left')
 
-                    # Verificar si faltaron coordenadas
                     clientes_sin_coord = df_nc['Latitud'].isna().sum()
                     if clientes_sin_coord > 0:
-                        st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'clientes_prueba.xlsx' y no aparecerán en el mapa.") 
+                        st.warning(f"⚠️ Atención: {clientes_sin_coord} cliente(s) de tu lista no se encontraron en 'clientes_prueba.xlsx' o no tenían coordenadas válidas, por lo que no aparecerán en el mapa.") 
                     
-                    # Filtrar solo los que sí tienen coordenadas válidas
                     df_nc = df_nc.dropna(subset=['Latitud', 'Longitud'])
 
-                    # Para los filtros, nos aseguramos de usar la columna correcta
                     columna_vendedor = 'Vendedor' if 'Vendedor' in df_nc.columns else df_nc.columns[2]
                     columna_dia = 'Dia' if 'Dia' in df_nc.columns else ('dia visita' if 'dia visita' in df_nc.columns else df_nc.columns[1])
 
+                    df_nc[columna_vendedor] = df_nc[columna_vendedor].astype(str).str.strip()
+
+                    vendedores_nc_unicos = sorted(df_nc[columna_vendedor].dropna().unique().tolist())
+                    mapa_colores_nc = {vendedor: colores_disponibles[i % len(colores_disponibles)] for i, vendedor in enumerate(vendedores_nc_unicos)}
+
                     st.sidebar.header("Filtros No Compradores")
-                    vendedores_nc = st.sidebar.multiselect("Seleccionar Vendedores:", sorted(df_nc[columna_vendedor].dropna().unique().tolist()), key="vend_nc")
+                    vendedores_nc = st.sidebar.multiselect("Seleccionar Vendedores:", vendedores_nc_unicos, key="vend_nc")
                     dias_unicos = sorted(df_nc[columna_dia].dropna().unique().tolist())
                     dias_nc = st.sidebar.multiselect("Seleccionar Días:", dias_unicos, default=[], key="dia_nc")
 
@@ -217,43 +230,23 @@ else:
                         
                         if not df_nc_f.empty:
                             centro = [df_nc_f['Latitud'].mean(), df_nc_f['Longitud'].mean()]
-                            m_nc = folium.Map(location=centro, zoom_start=14, tiles='cartodbpositron')
+                            m_nc = folium.Map(location=centro, zoom_start=14, tiles='OpenStreetMap')
 
                             for _, row in df_nc_f.iterrows():
                                 coord = [row['Latitud'], row['Longitud']]
                                 cod_cliente = row['Codigo_Cliente']
                                 nombre_cliente = row.get('Cliente', 'Nombre no disponible')
                                 dir_cliente = row.get('Direccion_Completa', 'Dirección no disponible')
+                                vendedor_actual = row[columna_vendedor]
                                 
-                                # AQUI COMIENZA LA MODIFICACION DE COLORES POR VENDEDOR
-                                color_vendedores = {
-                                    'VICTORIA MORGADO': 'green',
-                                    'LORENA RIQUELME': 'blue',  # Reemplazaste a ALEJANDRO GARCIA por LORENA RIQUELME
-                                    'VICTORIA LAGOS': 'red',
-                                    'PAULA PEDERNERA': 'pink',
-                                    'MATHIAS DOR': 'orange',
-                                    'SANTIAGO SAV': 'darkred', 
-                                    'DALIA LOP': 'purple',
-                                    'MAXIMILIANO LUP': 'beige' 
-                                }
-                                
-                                # Leemos el texto del Excel y lo pasamos a MAYÚSCULAS para evitar errores
-                                vendedor_actual = str(row[columna_vendedor]).upper()
-                                color_pin = 'gray' # Color gris por defecto
-                                
-                                # Buscamos si el nombre base está dentro del texto del vendedor actual
-                                for clave, color in color_vendedores.items():
-                                    if clave in vendedor_actual:
-                                        color_pin = color
-                                        break
-                                # AQUI TERMINA LA MODIFICACION
+                                color_pin = mapa_colores_nc.get(vendedor_actual, 'gray')
                                     
                                 html_popup = f"""
                                 <div style="font-family: Arial, sans-serif; min-width: 250px; font-size: 12px;">
                                     <h4 style="margin: 0 0 5px 0; color: #555555;">{nombre_cliente}</h4>
                                     <table style="width: 100%; border-collapse: collapse;">
                                         <tr><td><b>Código:</b></td><td>{row['Codigo_Cliente']}</td></tr>
-                                        <tr><td><b>Vendedor:</b></td><td>{row[columna_vendedor]}</td></tr>
+                                        <tr><td><b>Vendedor:</b></td><td>{vendedor_actual}</td></tr>
                                         <tr><td><b>Día:</b></td><td>{row[columna_dia]}</td></tr>
                                         <tr><td colspan="2"><hr style="margin: 5px 0;"></td></tr>
                                         <tr><td colspan="2"><b>Dirección:</b><br>{dir_cliente}</td></tr>
@@ -285,3 +278,4 @@ else:
                 st.error("❌ No se encontró el archivo 'clientes_prueba.xlsx'. Recuerda subirlo a GitHub para que Streamlit lo pueda leer.")
         else:
             st.warning("⚠️ No se encontró el archivo 'no_compradores.xlsx'. Por favor, asegúrate de guardarlo en la misma carpeta que este script.")
+
