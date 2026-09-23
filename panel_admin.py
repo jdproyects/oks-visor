@@ -4,6 +4,27 @@ import folium
 from streamlit_folium import st_folium
 import os
 
+def arreglar_coord(val, limite):
+    if pd.isna(val) or val == '':
+        return None
+    try:
+        v = str(val).strip()
+        # Si el Excel trajo separador de miles y coma decimal (ej: -34.567,89)
+        if '.' in v and ',' in v:
+            v = v.replace('.', '').replace(',', '.')
+        else:
+            v = v.replace(',', '.')
+        
+        num = float(v)
+        
+        # Si el número es gigante porque perdió el decimal, lo dividimos hasta que sea real
+        while abs(num) > limite and num != 0:
+            num = num / 10.0
+            
+        return num
+    except:
+        return None
+        
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Distribuidora OKS - Panel", layout="wide")
 
@@ -67,9 +88,11 @@ else:
             df['Vendedor'] = df['Vendedor'].astype(str).str.strip()
             df['Dia'] = df['Dia'].astype(str).str.strip()
             
-            df['Latitud'] = pd.to_numeric(df['Latitud'].astype(str).str.replace(',', '.'), errors='coerce')
-            df['Longitud'] = pd.to_numeric(df['Longitud'].astype(str).str.replace(',', '.'), errors='coerce')
-            
+            # Reemplazar comas por puntos y forzar formato numérico de forma inteligente
+            df['Latitud'] = df['Latitud'].apply(lambda x: arreglar_coord(x, 90))
+            df['Longitud'] = df['Longitud'].apply(lambda x: arreglar_coord(x, 180))
+
+            # Descartamos los clientes sin coordenadas válidas
             df = df.dropna(subset=['Latitud', 'Longitud'])
             
             # --- ASIGNACIÓN DINÁMICA DE COLORES POR VENDEDOR ---
